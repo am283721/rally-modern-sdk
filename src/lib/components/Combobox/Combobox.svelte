@@ -1,26 +1,38 @@
 <script lang="ts">
 	import { Keys } from '$lib/utils/keyboard';
-
-	import type { ComboboxItem } from 'src/types';
-
 	import Input from '../Input/Input.svelte';
+	type ComboboxItem = { displayText: string; displaySubText?: string; value: any };
 
-	// export let pagination = true;
-	// export let pageSize = 10;
+	export let limit = 50;
+	export let pagination = false;
+	export let pageSize = 20;
 	export let data: ComboboxItem[] = [];
 	export let selectedItem: ComboboxItem | undefined = undefined;
 	export let hasSearch = true;
 
-	let filteredData = data;
 	let searchInput: Input;
 	let comboContainer: HTMLDivElement;
 	let comboButton: HTMLDivElement;
 	let expanded = false;
 	let searchValue = '';
 	let activeItem: ComboboxItem | undefined = undefined;
+	let currentPage = 0;
 
 	$: hasSearch && expanded && searchInput && searchInput.focus();
-	$: filteredData = searchValue === '' ? data : data.filter((d) => d.displayText.indexOf(searchValue) > -1);
+	$: filteredData = (searchValue && data.filter((d) => d.displayText.toLowerCase().indexOf(searchValue.toLowerCase()) > -1)) || data;
+	$: dropdownItems = (() => {
+		let filtered = filteredData;
+
+		if (shouldPaginate()) {
+			filtered = filtered.slice(currentPage * pageSize, currentPage * pageSize + pageSize);
+		}
+
+		if (shouldShowLimit()) {
+			filtered = filtered.slice(0, limit);
+		}
+
+		return filtered;
+	})();
 
 	const setSelectedItem = (item: ComboboxItem) => {
 		selectedItem = item;
@@ -39,7 +51,6 @@
 	};
 
 	const handleButtonKeyDown = (e: KeyboardEvent) => {
-		console.log(e);
 		switch (e.key) {
 			// Ref: https://www.w3.org/WAI/ARIA/apg/patterns/combobox/
 			case Keys.Space:
@@ -77,13 +88,13 @@
 					break;
 				case Keys.ArrowDown:
 					e.preventDefault();
-					activeItem = filteredData.at(index + 1);
+					activeItem = dropdownItems.at(index + 1);
 					newEl = (target.nextSibling || target.parentNode?.firstChild) as HTMLLIElement;
 					if (newEl) newEl.focus();
 					break;
 				case Keys.ArrowUp:
 					e.preventDefault();
-					activeItem = filteredData.at(index - 1);
+					activeItem = dropdownItems.at(index - 1);
 					newEl = (target.previousSibling || target.parentNode?.lastChild) as HTMLLIElement;
 					if (newEl) newEl.focus();
 					break;
@@ -106,6 +117,11 @@
 		if (!expanded) return;
 		if (!comboContainer?.contains(event.target as HTMLElement)) closeCombo();
 	};
+
+	const shouldPaginate = () => pagination && filteredData.length > pageSize;
+	const shouldShowLimit = () => !pagination && limit && hasSearch && data.length > limit;
+	const nextPage = () => currentPage++;
+	const previousPage = () => currentPage--;
 </script>
 
 <svelte:window on:mousedown={handleGlobalMousedown} />
@@ -140,12 +156,19 @@
 
 			{#if hasSearch}
 				<div class="search-wrapper" tabindex="-1">
-					<Input placeholder="Search" icon="search" bind:value={searchValue} bind:this={searchInput} on:keydown={handleSearchKeydown} />
+					<Input
+						placeholder="Search"
+						icon="search"
+						bind:value={searchValue}
+						bind:this={searchInput}
+						on:input={() => (currentPage = 0)}
+						on:keydown={handleSearchKeydown}
+					/>
 				</div>
 			{/if}
 
 			<ul tabindex="-1">
-				{#each filteredData as item, i}
+				{#each dropdownItems as item, i}
 					<li
 						tabindex="0"
 						on:click={() => handleItemClick(item)}
@@ -163,6 +186,48 @@
 					</li>
 				{/each}
 			</ul>
+			{#if shouldPaginate()}
+				{@const minCount = currentPage * pageSize + 1}
+				{@const rawMaxCount = currentPage * pageSize + pageSize}
+				{@const filteredTotal = filteredData.length}
+				{@const maxCount = rawMaxCount < filteredTotal ? rawMaxCount : filteredTotal}
+				<div class="footer pagination">
+					<button class="button pagination-button" disabled={currentPage === 0} on:click={previousPage}>
+						<svg
+							aria-hidden="false"
+							class="smb-SvgIcon smb-SvgIcon--leftFull"
+							focusable="false"
+							role="img"
+							style="height: 1.6rem; width: 1.6rem;"
+							viewBox="0 0 16 16"
+							><title>Previous</title><g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"
+								><rect x="0" y="0" width="16" height="16" /><path
+									d="M5,7.97401547 L9.87204383,3.19002089 C9.99602537,3.06827998 10.1633593,3 10.3377284,3 C10.7034909,3 11,3.29440772 11,3.65757806 L11,12.3424219 C11,12.5167863 10.9302541,12.6840121 10.8060996,12.8073259 C10.5475076,13.0641669 10.1281804,13.0642331 9.86950613,12.8074738 L5,7.97401547 Z"
+									fill="currentColor"
+								/></g
+							></svg
+						>
+					</button>
+					<div class="pagination-text">
+						<span>{`Showing results ${filteredTotal ? minCount : 0}-${maxCount} of ${filteredTotal}`}</span>
+					</div>
+					<button class="button pagination-button" disabled={rawMaxCount > filteredTotal} on:click={nextPage}>
+						<svg aria-hidden="false" focusable="false" role="img" style="height: 1.6rem; width: 1.6rem;" viewBox="0 0 16 16"
+							><title>Next</title><g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"
+								><rect x="0" y="0" width="16" height="16" /><path
+									d="M11,7.97401547 L6.13049387,12.8074738 C5.87181959,13.0642331 5.45249242,13.0641669 5.1939004,12.8073259 C5.06974593,12.6840121 5,12.5167863 5,12.3424219 L5,3.65757806 C5,3.29440772 5.29650909,3 5.6622716,3 C5.83664074,3 6.00397463,3.06827998 6.12795617,3.19002089 L11,7.97401547 Z"
+									fill="currentColor"
+								/></g
+							></svg
+						>
+					</button>
+				</div>
+			{/if}
+			{#if shouldShowLimit()}
+				<div class="footer limit">
+					<span>{`Showing ${dropdownItems.length} of ${data.length} items. Search to narrow results`}</span>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -198,7 +263,7 @@
 
 	.button-wrapper:hover {
 		background-color: #fff;
-		border-color: #5691f0;
+		border-color: var(--hover-border-color);
 		outline: none;
 		box-shadow: none;
 	}
@@ -206,7 +271,7 @@
 	.button-wrapper:focus {
 		background-color: #fff;
 		border-color: #c8d1e0;
-		box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.2rem #1d5bbf;
+		box-shadow: var(--focus-box-shadow);
 		outline: none;
 	}
 
@@ -307,10 +372,6 @@
 		outline: none;
 	}
 
-	/* .combobox-wrapper ul li:not(:last-child) {
-		margin-bottom: 0;
-	} */
-
 	.combobox-wrapper ul li.is-selected {
 		background-color: #c8d1e0;
 	}
@@ -342,5 +403,51 @@
 	.combobox-wrapper ul li div span.item-subtext {
 		color: #58606e;
 		margin-left: auto;
+	}
+
+	.pagination {
+		display: flex;
+		flex-direction: row;
+		height: 2rem;
+		/* border-top: 1px solid #58606e; */
+	}
+
+	.pagination .pagination-text {
+		display: flex;
+		flex: 1;
+		justify-content: center;
+		align-items: center;
+		text-align: center;
+		/* font-size: 0.9rem; */
+		/* line-height: 1.2; */
+	}
+
+	.pagination .pagination-button {
+		height: auto;
+		font-size: 1.4rem;
+		border-radius: 0;
+	}
+
+	.pagination .pagination-button:disabled {
+		background-color: #ebeff5;
+		border-color: #c8d1e0;
+		color: #58606e;
+		cursor: default;
+	}
+
+	.footer {
+		background-color: #f0f5fc;
+		border-bottom-left-radius: 0.4rem;
+		border-bottom-right-radius: 0.4rem;
+		border-top: 1px solid #c8d1e0;
+		color: #434a54;
+		display: flex;
+		font-weight: bold;
+		width: 100%;
+		user-select: none;
+	}
+
+	.limit {
+		padding: 0.3rem 2rem 0.3rem 1rem;
 	}
 </style>

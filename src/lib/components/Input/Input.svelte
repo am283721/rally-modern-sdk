@@ -87,7 +87,7 @@
 	.wrapper:not(.is-disabled) input:focus {
 		background-color: #fff;
 		border-color: #c8d1e0;
-		box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.2rem #1d5bbf;
+		box-shadow: var(--focus-box-shadow);
 		outline: none;
 	}
 
@@ -96,7 +96,6 @@
 		border: 0;
 		border-radius: 3px;
 		padding: 0 0.6rem;
-		/* width: calc(100% - 4rem); */
 		width: 100%;
 		font-size: 1.2rem;
 		height: 2.4rem;

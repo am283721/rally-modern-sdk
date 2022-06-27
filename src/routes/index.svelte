@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Input } from '$lib';
-	import Combobox from '$lib/components/Combobox/Combobox.svelte';
-	import '../normalize.css';
+	import { Input, Combobox } from '$lib';
+	import '../styles/normalize.css';
+	import '../styles/variables.css';
 
 	let inputVal = 'test';
 	let disabledInputVal = "I'm disabled";
