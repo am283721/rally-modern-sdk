@@ -1,3 +1,5 @@
+import { toast } from '$lib/components/Toast/store';
+import { loadingMessage } from '$lib/components/LoadingMask/store';
 import type { RallyLookbackStoreConfig, RallyModelName, RallyWSAPIStoreConfig, RallyError, Deferred } from './rallySDKTypes';
 
 export let app: any;
@@ -42,7 +44,7 @@ export const query = async (modelName: RallyModelName, storeConfig: RallyWSAPISt
 		...storeConfig
 	});
 
-	const results = (await deferredToPromise(store.load())) as any[];
+	const results = (await promisify(store.load())) as any[];
 
 	return results.map((r) => ({ ...r, ...r.getData(true) }));
 };
@@ -55,7 +57,7 @@ export const queryLookback = async (storeConfig: RallyLookbackStoreConfig = {}) 
 		...storeConfig
 	});
 
-	const results = (await deferredToPromise(store.load())) as any[];
+	const results = (await promisify(store.load())) as any[];
 
 	return results.map((r) => ({ ...r, ...r.getData(true) }));
 };
@@ -156,21 +158,16 @@ export const promisify = async (deferred: Deferred) => {
 				resolve(result);
 			},
 			failure(error: RallyError) {
-				Rally.getApp().setLoading(false);
 				reject(error);
 			}
 		});
 	});
 };
 
-export const parseError = (e: string | RallyError, defaultMessage: string) => {
-	defaultMessage = defaultMessage || 'An unknown error has occurred';
-
+export const parseError = (e: string | RallyError, defaultMessage = 'An unknown error has occurred') => {
 	if (typeof e === 'string') {
 		return e || defaultMessage;
 	}
-
-	console.error(e);
 
 	if (e.message && e.message.length) {
 		return e.message;
@@ -189,6 +186,18 @@ export const parseError = (e: string | RallyError, defaultMessage: string) => {
 	return defaultMessage;
 };
 
-export const showError = (msg: string | RallyError, defaultMessage = 'An unknown error has occurred') => {
-	Rally.ui.notify.Notifier.showError({ message: parseError(msg, defaultMessage) });
+export const showMessage = (msg: string, durationMs: number) => toast.show(msg, durationMs);
+export const showSuccess = (msg: string, durationMs: number) => toast.showSuccess(msg, durationMs);
+export const showWarning = (msg: string, durationMs: number) => toast.showWarning(msg, durationMs);
+
+export const showError = (msg: string | RallyError, defaultMessage?: string, durationMs = 5000) => {
+	toast.showError(parseError(msg, defaultMessage), durationMs);
+};
+
+export const setLoading = (msg: string | boolean) => {
+	if (typeof msg === 'boolean') {
+		loadingMessage.set(msg ? 'Loading...' : '');
+	} else {
+		loadingMessage.set(msg);
+	}
 };

@@ -209,7 +209,7 @@
 						>
 					</button>
 					<div class="pagination-text">
-						<span>{`Showing results ${filteredTotal ? minCount : 0}-${maxCount} of ${filteredTotal}`}</span>
+						<span class="footer-detail-text">{`Showing results ${filteredTotal ? minCount : 0}-${maxCount} of ${filteredTotal}`}</span>
 					</div>
 					<button class="button pagination-button" disabled={rawMaxCount > filteredTotal} on:click={nextPage}>
 						<svg aria-hidden="false" focusable="false" role="img" style="height: 1.6rem; width: 1.6rem;" viewBox="0 0 16 16"
@@ -225,7 +225,7 @@
 			{/if}
 			{#if shouldShowLimit()}
 				<div class="footer limit">
-					<span>{`Showing ${dropdownItems.length} of ${data.length} items. Search to narrow results`}</span>
+					<span class="footer-detail-text">{`Showing ${dropdownItems.length} of ${data.length} items. Search to narrow results`}</span>
 				</div>
 			{/if}
 		</div>
@@ -251,7 +251,7 @@
 		border-radius: 3px;
 		box-shadow: none;
 		color: #333840;
-		font-size: 1.3rem;
+		font-size: 1.2rem;
 		line-height: 1.4;
 		height: 2.4rem;
 		cursor: pointer;
@@ -275,23 +275,22 @@
 		outline: none;
 	}
 
-	.button-wrapper span {
+	.button-wrapper > span {
 		align-items: center;
 		display: flex;
 		height: 100%;
-		/* margin-right: 2rem; */
 		width: calc(100% - 1.6rem);
 		flex: 1;
 	}
 
-	.button-wrapper span span.selected-value-text {
+	.button-wrapper > span > span.selected-value-text {
 		margin-right: 0.4rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	.button-wrapper span span.selected-value-subtext {
+	.button-wrapper > span > span.selected-value-subtext {
 		font-size: 1.1rem;
 		color: #58606e;
 		margin-left: auto;
@@ -332,7 +331,6 @@
 		background-clip: padding-box;
 		border-radius: 0.3rem;
 		display: block;
-		font-size: 1.4rem;
 		left: 0;
 		list-style: none;
 		margin-bottom: 0;
@@ -355,14 +353,13 @@
 		color: #333840;
 		cursor: pointer;
 		display: flex;
-		font-size: 1.4rem;
 		font-stretch: normal;
 		font-style: normal;
 		font-weight: normal;
 		/* height: 4rem; */
 		letter-spacing: normal;
 		line-height: 1.43;
-		padding: 0.6rem 1.2rem;
+		padding: 0.4rem 1.2rem;
 		text-align: left;
 		vertical-align: middle;
 		white-space: nowrap;
@@ -380,27 +377,27 @@
 		background-color: #ebeff5;
 	}
 
-	.combobox-wrapper ul li div {
+	.combobox-wrapper > ul > li > div {
 		align-items: center;
 		display: flex;
 		line-height: 1;
 		width: 100%;
 	}
 
-	.combobox-wrapper ul li div span {
+	.combobox-wrapper > ul > li > div > span {
 		max-width: 34.4rem;
 		display: inline-block;
 		line-height: normal;
 	}
 
-	.combobox-wrapper ul li div span.item-text {
+	.combobox-wrapper > ul > li > div span.item-text {
 		margin-right: 0.8rem;
 		overflow: hidden;
-		text-overflow: ellipsis;
 		white-space: nowrap;
+		text-overflow: ellipsis;
 	}
 
-	.combobox-wrapper ul li div span.item-subtext {
+	.combobox-wrapper > ul > li > div span.item-subtext {
 		color: #58606e;
 		margin-left: auto;
 	}
@@ -418,13 +415,10 @@
 		justify-content: center;
 		align-items: center;
 		text-align: center;
-		/* font-size: 0.9rem; */
-		/* line-height: 1.2; */
 	}
 
 	.pagination .pagination-button {
 		height: auto;
-		font-size: 1.4rem;
 		border-radius: 0;
 	}
 
@@ -442,11 +436,15 @@
 		border-top: 1px solid #c8d1e0;
 		color: #434a54;
 		display: flex;
+		font-size: 0.9rem;
 		font-weight: bold;
 		width: 100%;
 		user-select: none;
 	}
 
+	.footer-detail-text {
+		margin: 0 10px;
+	}
 	.limit {
 		padding: 0.3rem 2rem 0.3rem 1rem;
 	}
