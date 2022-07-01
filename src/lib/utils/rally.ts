@@ -2,7 +2,7 @@ import { toast } from '$lib/components/Toast/store';
 import { loadingMessage } from '$lib/components/LoadingMask/store';
 import type { RallyLookbackStoreConfig, RallyModelName, RallyWSAPIStoreConfig, RallyError, Deferred } from './rallySDKTypes';
 
-export let app: any;
+let app: any;
 
 const storeDefaults: RallyWSAPIStoreConfig = {
 	autoLoad: false,
@@ -201,3 +201,6 @@ export const setLoading = (msg: string | boolean) => {
 		loadingMessage.set(msg);
 	}
 };
+
+export const getContext = () => app.getContext();
+export const getDataContext = () => app.getContext().getDataContext();
