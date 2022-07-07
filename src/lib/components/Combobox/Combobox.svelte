@@ -193,13 +193,7 @@
 				{@const maxCount = rawMaxCount < filteredTotal ? rawMaxCount : filteredTotal}
 				<div class="footer pagination">
 					<button class="button pagination-button" disabled={currentPage === 0} on:click={previousPage}>
-						<svg
-							aria-hidden="false"
-							class="smb-SvgIcon smb-SvgIcon--leftFull"
-							focusable="false"
-							role="img"
-							style="height: 1.6rem; width: 1.6rem;"
-							viewBox="0 0 16 16"
+						<svg aria-hidden="false" focusable="false" role="img" style="height: 1.6rem; width: 1.6rem;" viewBox="0 0 16 16"
 							><title>Previous</title><g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"
 								><rect x="0" y="0" width="16" height="16" /><path
 									d="M5,7.97401547 L9.87204383,3.19002089 C9.99602537,3.06827998 10.1633593,3 10.3377284,3 C10.7034909,3 11,3.29440772 11,3.65757806 L11,12.3424219 C11,12.5167863 10.9302541,12.6840121 10.8060996,12.8073259 C10.5475076,13.0641669 10.1281804,13.0642331 9.86950613,12.8074738 L5,7.97401547 Z"
