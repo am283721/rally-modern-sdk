@@ -148,6 +148,141 @@ const buildUrl = (input: string) => {
 	return `${Rally.environment.getServer().getWsapiUrl()}${input}`;
 };
 
+enum artifactColorPalette {
+	'#105cab' = 'Dark Blue',
+	'#21a2e0' = 'Blue',
+	'#107c1e' = 'Green',
+	'#4a1d7e' = 'Purple',
+	'#df1a7b' = 'Pink',
+	'#ee6c19' = 'Burnt Orange',
+	'#f9a814' = 'Orange',
+	'#fce205' = 'Yellow',
+	'#848689' = 'Grey'
+}
+
+const createDetailLink = (record: Record<string, any>) => {
+	const options = {
+		record,
+		text: record.FormattedID || '',
+		showHover: true,
+		projectOid: undefined as unknown,
+		onclick: undefined as unknown,
+		showTooltip: true
+	};
+
+	const ref = Rally.util.Ref.getRelativeUri(record);
+	const type = Rally.util.Ref.getTypeFromRef(ref);
+
+	if (type === 'testset') {
+		if (ref) {
+			options.onclick = "Rally.nav.Manager.edit('" + ref + "'); return false;";
+		}
+	} else if (type === 'milestone') {
+		const projectToNavigateTo = record.TargetProject || record.context.getProject();
+		options.projectOid = Rally.util.Ref.getOidFromRef(projectToNavigateTo);
+	}
+
+	return Rally.nav.DetailLink.getLink(options);
+};
+
+export const getFieldDisplayValue = (record: Record<string, any>, field: string, delimiter = ', ') => {
+	if (!record || !field || !Object.prototype.hasOwnProperty.call(record, field) || record[field] === undefined || record[field] === null) {
+		return '';
+	}
+
+	let val = record[field];
+
+	if (field === 'FormattedID') {
+		if (record.Recycled) return val;
+
+		return createDetailLink(record);
+	}
+
+	if (typeof val === 'boolean') {
+		return val.toString();
+	}
+
+	if (Ext.isDate(val)) {
+		return Rally.util.DateTime.formatWithDefaultDateTime(val);
+	}
+
+	if (field === 'DisplayColor') {
+		return artifactColorPalette[val as keyof typeof artifactColorPalette] || val;
+	}
+
+	if (field === 'Parent') {
+		if (val && val.FormattedID && val.Name) {
+			return val.FormattedID + ': ' + val.Name;
+		}
+
+		if (val && val._refObjectName) {
+			return val._refObjectName;
+		}
+
+		if (record.Feature && record.Feature.FormattedID && record.Feature.Name) {
+			return record.Feature.FormattedID + ': ' + record.Feature.Name;
+		}
+
+		return 'No Parent';
+	}
+
+	if (field === 'Release') {
+		return (val && val.Name) || 'Unscheduled';
+	}
+
+	if (field === 'Project') {
+		return (val && val.Name) || 'Failed to convert project field';
+	}
+
+	if (field === 'Predecessors' || field === 'Successors') {
+		return typeof val === 'object' && typeof val.Count === 'number' ? val.Count : '';
+	}
+
+	if (field === 'PredecessorsAndSuccessors') {
+		return typeof val.Predecessors === 'number' ? `Predecessors: ${val.Predecessors}; Successors: ${val.Successors}` : '';
+	}
+
+	if (field === 'Owner' || field === 'CreatedBy') {
+		val = (val && (val.DisplayName || (val.FirstName && val.LastName && `${val.FirstName} ${val.LastName}`) || val._refObjectName)) || '';
+
+		if (!val && field === 'Owner') {
+			return 'No Owner';
+		}
+
+		return val;
+	}
+
+	if (field === 'PreliminaryEstimate') {
+		return `${val.Name} (${val.Value})`;
+	}
+
+	if (field === 'Milestones') {
+		if (val.Count) {
+			return val._tagsNameArray.map((m: { FormattedID: string; Name: string }) => `${m.FormattedID}: ${m.Name}`).join(delimiter);
+		}
+
+		return 'None';
+	}
+
+	if (field.toLowerCase().indexOf('portfolioitem/') > -1 || field === 'Feature') {
+		return (val && `${val.FormattedID}: ${val.Name}`) || 'None';
+	}
+
+	if (Ext.isArray(val)) {
+		return val.join(delimiter);
+	}
+
+	if (typeof val === 'object') {
+		if (val._tagsNameArray) {
+			return val._tagsNameArray.map((m: { Name: string; Value: string }) => m.Name || m.Value).join(delimiter);
+		}
+
+		return val.Name || val.value || val._refObjectName || 'Unable to convert field for export';
+	}
+
+	return val;
+};
+
 export const promisify = async (deferred: Deferred) => {
 	if (!deferred || !(deferred.then instanceof Function)) {
 		return Promise.reject(new Error('Promisify was passed an invalid deferred object'));

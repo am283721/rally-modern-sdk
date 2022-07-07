@@ -1,7 +1,12 @@
 <script lang="ts">
-	import { Input, Combobox } from '$lib';
-	import '../styles/normalize.css';
-	import '../styles/variables.css';
+	import Combobox from '$lib/components/Combobox/Combobox.svelte';
+	import Input from '$lib/components/Input/Input.svelte';
+	import Grid from '$lib/components/Grid/Grid.svelte';
+	import { initRallyApp, query } from '$lib/utils/rally';
+	import '../lib/styles/normalize.css';
+	import '../lib/styles/variables.css';
+	import type { Column } from '$lib/components/Grid/types';
+	import App from '$lib/App.svelte';
 
 	let inputVal = 'test';
 	let disabledInputVal = "I'm disabled";
@@ -25,7 +30,39 @@
 		{ displayText: 'test 5', value: {} },
 		{ displayText: 'test 6', value: {} }
 	];
+
+	const sorterFn = (a: any, b: any) => {
+		if (!a) {
+			if (!b) {
+				return 0;
+			}
+			return -1;
+		}
+		if (!b) {
+			return 1;
+		}
+		return a > b ? 1 : a < b ? -1 : 0;
+	};
+
+	const gridFetch = ['FormattedID', 'Name', 'InProgressDate', 'Owner', 'Description', 'ScheduleState'];
+	const gridColumns: Column[] = [
+		{ text: 'ID', dataIndex: 'FormattedID', columnType: 'numeric' },
+		{ text: 'Name', dataIndex: 'Name' },
+		{ text: 'In Progress Date', dataIndex: 'InProgressDate' },
+		{ text: 'Owner', dataIndex: 'Owner', sorterFn },
+		{ text: 'Description', dataIndex: 'Description', sortable: false },
+		{ text: 'State', dataIndex: 'ScheduleState', width: '100px', renderer: (value, record) => `<span style="color: blue;">${value}</span>` }
+	];
+	let gridData = initRallyApp('test').then(() =>
+		query('HierarchicalRequirement', {
+			pageSize: 50,
+			autoLoad: true,
+			fetch: gridFetch
+		})
+	);
 </script>
+
+<App />
 
 <div class="container">
 	<div class="input-or-combo-container">
@@ -37,6 +74,11 @@
 	<div class="input-or-combo-container">
 		<Combobox data={comboboxData} />
 	</div>
+	<div class="grid-container">
+		{#await gridData then data}
+			<Grid columns={gridColumns} {data} />
+		{/await}
+	</div>
 </div>
 
 <style>
@@ -44,6 +86,8 @@
 		display: flex;
 		flex-direction: column;
 		padding: 2rem;
+		height: 100vh;
+		overflow-y: auto;
 	}
 
 	.container div {
@@ -52,5 +96,11 @@
 
 	.input-or-combo-container {
 		max-width: 32rem;
+	}
+
+	.grid-container {
+		max-height: 900px;
+		overflow: hidden;
+		overflow-y: scroll;
 	}
 </style>
