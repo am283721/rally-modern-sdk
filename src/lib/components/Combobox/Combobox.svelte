@@ -1,14 +1,29 @@
 <script lang="ts">
 	import { Keys } from '$lib/utils/keyboard';
+	import { getFieldDisplayValue, showError, urlRequest } from '$lib/utils/rally';
+	import type { RallyUrlRequestParams, RallyWSAPIStoreConfig } from '$lib/utils/rallySDKTypes';
 	import Input from '../Input/Input.svelte';
+
 	type ComboboxItem = { displayText: string; displaySubText?: string; value: any };
 
+	/**
+	 * Default is 50
+	 * Limit the number of results shown. User then uses the search input to find other values not shown.
+	 * pagination must be false and hasSearch must be true
+	 */
 	export let limit = 50;
 	export let pagination = false;
 	export let pageSize = 20;
-	export let data: ComboboxItem[] = [];
-	export let selectedItem: ComboboxItem | undefined = undefined;
 	export let hasSearch = true;
+	export let allowBlank = true;
+	export let blankText = '-- No Entry --';
+	export let blankValue = null;
+	export let data: Record<string, any>[] | undefined = undefined;
+	export let selectedItem: ComboboxItem | undefined = undefined;
+	export let displayField: string;
+	export let displaySubField: string | undefined = undefined;
+	export let storeConfig: RallyWSAPIStoreConfig | undefined = undefined;
+	export let queryDelay = 700;
 
 	let searchInput: Input;
 	let comboContainer: HTMLDivElement;
@@ -17,22 +32,130 @@
 	let searchValue = '';
 	let activeItem: ComboboxItem | undefined = undefined;
 	let currentPage = 0;
+	let loadingData = false;
+	let blankItem: ComboboxItem = { displayText: blankText, displaySubText: '', value: blankValue };
+	let formattedData: ComboboxItem[] = [];
+	let dropdownItems: ComboboxItem[] = [];
+	let totalCount = 0;
+	let remoteData = false;
+	let queryTimer: string | number | NodeJS.Timeout | undefined;
 
+	const includeBlankItem = () => allowBlank && currentPage === 0;
+
+	const formatData = (rawData: any[]) => {
+		return rawData.map((item) => {
+			const displayText = getFieldDisplayValue(item, displayField!);
+			const displaySubText = displaySubField ? getFieldDisplayValue(item, displaySubField) : '';
+
+			return { displayText, displaySubText, value: item };
+		});
+	};
+
+	const filterData = async (page: number) => {
+		let newData: ComboboxItem[] = [];
+
+		if (remoteData) {
+			const results = await loadRemoteData();
+			totalCount = results.$TotalResultCount;
+			newData = formatData(results);
+		} else {
+			newData = formattedData;
+
+			if (searchValue) {
+				newData = formattedData.filter((d) => d.displayText.toLowerCase().indexOf(searchValue.toLowerCase()) > -1);
+			}
+
+			if (shouldPaginate()) {
+				newData = newData.slice(page * pageSize, page * pageSize + pageSize);
+			}
+
+			if (shouldShowLimit()) {
+				newData = newData.slice(0, limit);
+			}
+		}
+
+		dropdownItems = includeBlankItem() ? [blankItem, ...newData] : newData;
+	};
+
+	const updatePage = (page: number) => filterData(page);
+
+	const updateSearchFilter = (filterText: string) => {
+		if (remoteData) {
+			clearTimeout(queryTimer);
+			queryTimer = setTimeout(() => filterData(currentPage), queryDelay);
+		} else {
+			filterData(currentPage);
+		}
+	};
+
+	const loadRemoteData = (): Promise<any[]> => {
+		loadingData = true;
+		const maxItems = includeBlankItem() ? pageSize - 1 : pageSize;
+
+		const config: RallyUrlRequestParams = {
+			limit: maxItems,
+			pagesize: maxItems,
+			start: currentPage * pageSize + 1,
+			order: displayField
+		};
+
+		if (storeConfig!.fetch) {
+			if (Array.isArray(storeConfig!.fetch)) {
+				config.fetch = storeConfig!.fetch.join(',');
+			} else {
+				config.fetch = storeConfig!.fetch;
+			}
+		}
+
+		// TODO: What if user wants to pass a query
+		if (searchValue) {
+			config.query = `(${displayField} contains "${searchValue}")`;
+
+			if (displaySubField) {
+				config.query = `(${config.query}) OR (${displayField} contains "${searchValue}")`;
+			}
+		}
+
+		return urlRequest(storeConfig!.model!, config)
+			.catch((e) => {
+				showError(e, 'Error while fetching Combobox store data');
+				return [];
+			})
+			.finally(() => (loadingData = false));
+	};
+
+	if (!displayField) {
+		throw new Error('Combobox config error: Display Field must be provided');
+	}
+
+	if (data) {
+		totalCount = data.length + (allowBlank ? 1 : 0);
+		formattedData = formatData(data);
+	} else {
+		if (!storeConfig) {
+			throw new Error('Combobox config error: Data or a store config object must be provided');
+		}
+		if (!storeConfig.model) {
+			throw new Error('Combobox config error: Model name not specified in store config');
+		}
+		remoteData = true;
+		loadingData = true;
+		pagination = true;
+		formattedData = [];
+
+		if (storeConfig.pageSize) {
+			pageSize = storeConfig.pageSize;
+		} else {
+			storeConfig.pageSize = pageSize;
+		}
+	}
+
+	// Focus on search input when combobox is expanded
 	$: hasSearch && expanded && searchInput && searchInput.focus();
-	$: filteredData = (searchValue && data.filter((d) => d.displayText.toLowerCase().indexOf(searchValue.toLowerCase()) > -1)) || data;
-	$: dropdownItems = (() => {
-		let filtered = filteredData;
 
-		if (shouldPaginate()) {
-			filtered = filtered.slice(currentPage * pageSize, currentPage * pageSize + pageSize);
-		}
+	$: updatePage(currentPage);
 
-		if (shouldShowLimit()) {
-			filtered = filtered.slice(0, limit);
-		}
-
-		return filtered;
-	})();
+	$: updateSearchFilter(searchValue);
 
 	const setSelectedItem = (item: ComboboxItem) => {
 		selectedItem = item;
@@ -118,8 +241,8 @@
 		if (!comboContainer?.contains(event.target as HTMLElement)) closeCombo();
 	};
 
-	const shouldPaginate = () => pagination && filteredData.length > pageSize;
-	const shouldShowLimit = () => !pagination && limit && hasSearch && data.length > limit;
+	const shouldPaginate = () => pagination && totalCount > pageSize;
+	const shouldShowLimit = () => !pagination && limit && hasSearch && totalCount > limit;
 	const nextPage = () => currentPage++;
 	const previousPage = () => currentPage--;
 </script>
@@ -138,8 +261,8 @@
 		on:focus={() => (expanded = false)}
 	>
 		<span>
-			<span class="selected-value-text">{(selectedItem && selectedItem.displayText) || ''}</span>
-			<span class="selected-value-subtext">{(selectedItem && selectedItem.displaySubText) || ''}</span>
+			<span class="selected-value-text" title={selectedItem?.displayText || ''}>{selectedItem?.displayText || ''}</span>
+			<span class="selected-value-subtext">{selectedItem?.displaySubText || ''}</span>
 		</span>
 		<svg class="icon" focusable="false" role="img" style="height: 1.6rem; width: 1.6rem;" viewBox="0 0 16 16"
 			><title>Dropdown</title><g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"
@@ -168,28 +291,32 @@
 			{/if}
 
 			<ul tabindex="-1">
-				{#each dropdownItems as item, i}
-					<li
-						tabindex="0"
-						on:click={() => handleItemClick(item)}
-						on:mouseenter={() => (activeItem = item)}
-						on:mouseleave={() => (activeItem = undefined)}
-						on:focus={() => (activeItem = item)}
-						on:blur={() => (activeItem = undefined)}
-						on:keydown={handleItemKeyDown(item, i)}
-						class="{activeItem === item ? 'is-active' : ''} {selectedItem === item ? 'is-selected' : ''}"
-					>
-						<div aria-label="{item.displayText} is {selectedItem === item ? '' : 'not'} selected ({i + 1} of {data.length})">
-							<span class="item-text" aria-hidden="true">{item.displayText}</span>
-							<span class="item-subtext" aria-hidden="true">{item.displaySubText || ''}</span>
-						</div>
-					</li>
-				{/each}
+				{#if loadingData}
+					<span class="selected-value-text">Loading...</span>
+				{:else}
+					{#each dropdownItems as item, i}
+						<li
+							tabindex="0"
+							on:click={() => handleItemClick(item)}
+							on:mouseenter={() => (activeItem = item)}
+							on:mouseleave={() => (activeItem = undefined)}
+							on:focus={() => (activeItem = item)}
+							on:blur={() => (activeItem = undefined)}
+							on:keydown={handleItemKeyDown(item, i)}
+							class="{activeItem === item ? 'is-active' : ''} {selectedItem === item ? 'is-selected' : ''}"
+						>
+							<div aria-label="{item.displayText} is {selectedItem === item ? '' : 'not'} selected ({i + 1} of {totalCount})">
+								<span class="item-text" aria-hidden="true">{item.displayText}</span>
+								<span class="item-subtext" aria-hidden="true">{item.displaySubText || ''}</span>
+							</div>
+						</li>
+					{/each}
+				{/if}
 			</ul>
 			{#if shouldPaginate()}
 				{@const minCount = currentPage * pageSize + 1}
 				{@const rawMaxCount = currentPage * pageSize + pageSize}
-				{@const filteredTotal = filteredData.length}
+				{@const filteredTotal = totalCount || 0}
 				{@const maxCount = rawMaxCount < filteredTotal ? rawMaxCount : filteredTotal}
 				<div class="footer pagination">
 					<button class="button pagination-button" disabled={currentPage === 0} on:click={previousPage}>
@@ -219,7 +346,9 @@
 			{/if}
 			{#if shouldShowLimit()}
 				<div class="footer limit">
-					<span class="footer-detail-text">{`Showing ${dropdownItems.length} of ${data.length} items. Search to narrow results`}</span>
+					<span class="footer-detail-text"
+						>{`Showing ${dropdownItems.length} of ${formattedData?.length || 'unknown length of'} items. Search to narrow results`}</span
+					>
 				</div>
 			{/if}
 		</div>
@@ -269,6 +398,13 @@
 		outline: none;
 	}
 
+	.button-wrapper.is-loading {
+		background-color: #ebeff5;
+		border-color: #c8d1e0;
+		color: #58606e;
+		cursor: default;
+	}
+
 	.button-wrapper > span {
 		align-items: center;
 		display: flex;
@@ -311,6 +447,8 @@
 		border-bottom: #c8d1e0 solid 1px;
 		margin: 0.3rem 0;
 		z-index: 1000;
+		width: 100%;
+		max-width: 36rem;
 	}
 
 	.search-wrapper {
@@ -379,7 +517,6 @@
 	}
 
 	.combobox-wrapper > ul > li > div > span {
-		max-width: 34.4rem;
 		display: inline-block;
 		line-height: normal;
 	}

@@ -1,13 +1,13 @@
 import { toast } from '$lib/components/Toast/store';
 import { loadingMessage } from '$lib/components/LoadingMask/store';
-import type { RallyLookbackStoreConfig, RallyModelName, RallyWSAPIStoreConfig, RallyError, Deferred } from './rallySDKTypes';
+import type { RallyLookbackStoreConfig, RallyModelName, RallyWSAPIStoreConfig, RallyError, Deferred, RallyUrlRequestParams } from './rallySDKTypes';
 
 let app: any;
 
 const storeDefaults: RallyWSAPIStoreConfig = {
 	autoLoad: false,
 	pageSize: 400,
-	limit: Infinity,
+	limit: 400,
 	fetch: ['ObjectID'],
 	context: undefined
 };
@@ -44,9 +44,14 @@ export const query = async (modelName: RallyModelName, storeConfig: RallyWSAPISt
 		...storeConfig
 	});
 
-	const results = (await promisify(store.load())) as any[];
+	let results = (await promisify(store.load())) as any[];
+	results = results.map((r) => ({ ...r, ...r.getData(true) }));
 
-	return results.map((r) => ({ ...r, ...r.getData(true) }));
+	// Note that $store will be lost any time the user manipulates the array of results (e.g.: slice)
+	Object.defineProperty(results, '$store', { enumerable: false, writable: true });
+	results.$store = store;
+
+	return results;
 };
 
 export const queryLookback = async (storeConfig: RallyLookbackStoreConfig = {}) => {
@@ -67,7 +72,7 @@ export const getFlowStates = async (projectRef?: string) => {
 
 	const ref = projectRef || app.getContext().getProjectRef();
 
-	return request('FlowState', {
+	return urlRequest('FlowState', {
 		query: `(project = "${ref}")`,
 		fetch: 'Name,ObjectID,AgeThreshold,ExitPolicy,WIPLimit,OrderIndex,ScheduleStateMapping',
 		order: 'OrderIndex'
@@ -82,7 +87,7 @@ export const getAllowedValues = async (artifactType: string, fieldName: string) 
 			throw new Error(`Unable to load allowed list for field ${fieldName}s`);
 		}
 
-		const attributes = (await request(results[0].Attributes._ref, { fetch: 'ElementName,AllowedValues' })) as {
+		const attributes = (await urlRequest(results[0].Attributes._ref, { fetch: 'ElementName,AllowedValues' })) as {
 			ElementName: string;
 			AllowedValues: { _ref: string };
 		}[];
@@ -93,7 +98,7 @@ export const getAllowedValues = async (artifactType: string, fieldName: string) 
 			throw new Error(`Unable to load allowed list for field ${fieldName}s`);
 		}
 
-		const allowedValues = (await request(attribute.AllowedValues._ref, { fetch: 'StringValue' })) as { StringValue: string }[];
+		const allowedValues = (await urlRequest(attribute.AllowedValues._ref, { fetch: 'StringValue' })) as { StringValue: string }[];
 
 		return allowedValues.map((v) => v.StringValue);
 	});
@@ -111,14 +116,14 @@ export const createSorter = (property: string, direction = 'ASC') => {
 	return Ext.util.Sorter({ property, direction });
 };
 
-const request = (endpoint: string, params = {}, method = 'GET') =>
-	new Promise((resolve, reject) => {
+export const urlRequest = (endpoint: string, params: RallyUrlRequestParams = {}, method = 'GET'): Promise<any[]> => {
+	return new Promise((resolve, reject) => {
 		Ext.Ajax.request({
 			url: buildUrl(endpoint),
 			method,
 			params: {
 				key: Rally.env.IoProvider.getSecurityToken(),
-				pagesize: 400,
+				pagesize: params.pagesize || 400,
 				...params
 			},
 			success: function (response: XMLHttpRequest) {
@@ -128,6 +133,8 @@ const request = (endpoint: string, params = {}, method = 'GET') =>
 					reject(data.Errors[0]);
 				}
 
+				data.Results.$TotalResultCount = data.TotalResultCount;
+
 				resolve(data.Results);
 			},
 			failure: function (response: XMLHttpRequest) {
@@ -135,6 +142,7 @@ const request = (endpoint: string, params = {}, method = 'GET') =>
 			}
 		});
 	});
+};
 
 const buildUrl = (input: string) => {
 	if (input.indexOf('http://') === 0 || input.indexOf('https://') === 0) {

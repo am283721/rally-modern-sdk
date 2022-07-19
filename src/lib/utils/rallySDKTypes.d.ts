@@ -135,6 +135,22 @@ export type RallyModelName =
 	| 'WorkspaceDomainObject'
 	| 'WorkspacePermission';
 
+export interface RallyUrlRequestParams {
+	query?: string;
+	fetch?: string;
+	order?: string;
+	limit?: number;
+	start?: number;
+	pagesize?: number;
+	compact?: boolean;
+	key?: string;
+	restrictToEditAccess?: boolean;
+	includePermissions?: boolean;
+	project?: string;
+	projectScopeUp?: boolean;
+	projectScopeDown?: boolean;
+}
+
 export type RallyError = {
 	message?: string;
 	exception?: boolean;

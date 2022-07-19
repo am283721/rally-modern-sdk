@@ -7,7 +7,9 @@
 	import '../lib/styles/variables.css';
 	import type { Column } from '$lib/components/Grid/types';
 	import App from '$lib/App.svelte';
+	import type { RallyWSAPIStoreConfig } from '$lib/utils/rallySDKTypes';
 
+	let gridData;
 	let inputVal = 'test';
 	let disabledInputVal = "I'm disabled";
 	let comboboxData = [
@@ -53,33 +55,43 @@
 		{ text: 'Description', dataIndex: 'Description', sortable: false },
 		{ text: 'State', dataIndex: 'ScheduleState', width: '100px', renderer: (value, record) => `<span style="color: blue;">${value}</span>` }
 	];
-	let gridData = initRallyApp('test').then(() =>
-		query('HierarchicalRequirement', {
-			pageSize: 50,
-			autoLoad: true,
-			fetch: gridFetch
-		})
+	const promise = initRallyApp('test').then(
+		async () =>
+			(gridData = await query('Defect', {
+				pageSize: 50,
+				limit: 50,
+				fetch: gridFetch
+			}))
 	);
+
+	const comboboxStoreConfig: RallyWSAPIStoreConfig = {
+		model: 'HierarchicalRequirement',
+		pageSize: 50,
+		fetch: gridFetch
+	};
 </script>
 
-<App />
+{#await promise then nothingToSeeHere}
+	<App />
 
-<div class="container">
-	<div class="input-or-combo-container">
-		<Input icon="" bind:value={inputVal} placeholder="test" />
+	<div class="container">
+		<div class="input-or-combo-container">
+			<Input icon="" bind:value={inputVal} placeholder="test" />
+		</div>
+		<div class="input-or-combo-container">
+			<Input icon="" disabled={true} bind:value={disabledInputVal} placeholder="test" />
+		</div>
+		<div class="input-or-combo-container">
+			<Combobox data={comboboxData} pageSize={10} displayField="displayText" />
+		</div>
+		<div class="input-or-combo-container">
+			<Combobox storeConfig={comboboxStoreConfig} displayField="Name" />
+		</div>
+		<div class="grid-container">
+			<Grid columns={gridColumns} data={gridData} />
+		</div>
 	</div>
-	<div class="input-or-combo-container">
-		<Input icon="" disabled={true} bind:value={disabledInputVal} placeholder="test" />
-	</div>
-	<div class="input-or-combo-container">
-		<Combobox data={comboboxData} />
-	</div>
-	<div class="grid-container">
-		{#await gridData then data}
-			<Grid columns={gridColumns} {data} />
-		{/await}
-	</div>
-</div>
+{/await}
 
 <style>
 	.container {
